@@ -329,5 +329,22 @@ class Databricks(LLM):
 
         if self.transform_output_fn:
             response = self.transform_output_fn(response)
+        
+        # Different possible patterns for various response formats
+        patterns = [
+            lambda r: r,
+            lambda r: str(r["choices"][0]["message"]["content"]),
+            lambda r: str(r["predictions"][0]["candidates"][0]["text"]),
+            lambda r: str(r["candidates"][0]["text"])
+        ]
 
-        return response
+        for pattern in patterns:
+            try:
+                result = pattern(response)
+                if isinstance(result, str):
+                    return result
+            except Exception as e:
+                pass
+
+        # If all patterns fail, try to return a string representation of the response
+        return str(response)
