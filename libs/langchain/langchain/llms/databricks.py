@@ -333,9 +333,8 @@ class Databricks(LLM):
         # Different possible patterns for various response formats
         patterns = [
             lambda r: r,
-            lambda r: str(r["choices"][0]["message"]["content"]),
-            lambda r: str(r["predictions"][0]["candidates"][0]["text"]),
-            lambda r: str(r["candidates"][0]["text"])
+            lambda r: str(r["choices"][0]["message"]["content"]), # chat completions
+            lambda r: str(r["choices"][0]["text"]), # completions
         ]
 
         for pattern in patterns:
