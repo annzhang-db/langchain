@@ -55,10 +55,31 @@ class _DatabricksServingEndpointClient(_DatabricksClientBase):
 
     def post(self, request: Any) -> Any:
         # See https://docs.databricks.com/machine-learning/model-serving/score-model-serving-endpoints.html
-        # wrapped_request = {"dataframe_records": [request]} # {"inputs": request} # request # {"dataframe_records": [request]}
-        _logger.info(f"REQUEST {request}")
-        response = self.post_raw(request) # ["predictions"]
-        _logger.info(f"RESPONSE {response}")
+        wrapped_request = {"dataframe_records": [request]}
+        response = self.post_raw(request)["predictions"]
+        # For a single-record query, the result is not a list.
+        if isinstance(response, list):
+            response = response[0]
+        return response
+    
+class _DatabricksOptimizedServingEndpointClient(_DatabricksClientBase):
+    """An API client that talks to a Databricks serving endpoint."""
+
+    host: str
+    endpoint_name: str
+
+    @root_validator(pre=True)
+    def set_api_url(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+        if "api_url" not in values:
+            host = values["host"]
+            endpoint_name = values["endpoint_name"]
+            api_url = f"https://{host}/serving-endpoints/{endpoint_name}/invocations"
+            values["api_url"] = api_url
+        return values
+
+    def post(self, request: Any) -> Any:
+        # See https://docs.databricks.com/en/machine-learning/foundation-models/api-reference.html#completion-task
+        response = self.post_raw(request)
         # For a single-record query, the result is not a list.
         if isinstance(response, list):
             response = response[0]
@@ -209,6 +230,10 @@ class Databricks(LLM):
     You must not set both ``endpoint_name`` and ``cluster_id``.
     """
 
+    is_optimized_endpoint: Optional[bool] = None
+    """If the model serving endpoint is optimized. The endpoint name must be specified.
+    """
+
     cluster_id: Optional[str] = None
     """ID of the cluster if connecting to a cluster driver proxy app.
     If neither ``endpoint_name`` nor ``cluster_id`` is not provided and the code runs
@@ -287,11 +312,18 @@ class Databricks(LLM):
     def __init__(self, **data: Any):
         super().__init__(**data)
         if self.endpoint_name:
-            self._client = _DatabricksServingEndpointClient(
-                host=self.host,
-                api_token=self.api_token,
-                endpoint_name=self.endpoint_name,
-            )
+            if self.is_optimized_endpoint:
+                self._client = _DatabricksServingEndpointClient(
+                    host=self.host,
+                    api_token=self.api_token,
+                    endpoint_name=self.endpoint_name,
+                )
+            else:
+                self._client = _DatabricksOptimizedServingEndpointClient(
+                    host=self.host,
+                    api_token=self.api_token,
+                    endpoint_name=self.endpoint_name,
+                )
         elif self.cluster_id and self.cluster_driver_port:
             self._client = _DatabricksClusterDriverProxyClient(
                 host=self.host,
@@ -338,6 +370,7 @@ class Databricks(LLM):
             lambda r: r,
             lambda r: str(r["choices"][0]["message"]["content"]), # chat completions
             lambda r: str(r["choices"][0]["text"]), # completions
+            lambda r: str(r["candidates"][0]["text"]),
         ]
 
         for pattern in patterns:
