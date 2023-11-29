@@ -56,7 +56,7 @@ class _DatabricksServingEndpointClient(_DatabricksClientBase):
     def post(self, request: Any) -> Any:
         # See https://docs.databricks.com/machine-learning/model-serving/score-model-serving-endpoints.html
         wrapped_request = {"dataframe_records": [request]}
-        response = self.post_raw(request)["predictions"]
+        response = self.post_raw(wrapped_request)["predictions"]
         # For a single-record query, the result is not a list.
         if isinstance(response, list):
             response = response[0]
@@ -313,13 +313,13 @@ class Databricks(LLM):
         super().__init__(**data)
         if self.endpoint_name:
             if self.is_optimized_endpoint:
-                self._client = _DatabricksServingEndpointClient(
+                self._client = _DatabricksOptimizedServingEndpointClient(
                     host=self.host,
                     api_token=self.api_token,
                     endpoint_name=self.endpoint_name,
                 )
             else:
-                self._client = _DatabricksOptimizedServingEndpointClient(
+                self._client = _DatabricksServingEndpointClient(
                     host=self.host,
                     api_token=self.api_token,
                     endpoint_name=self.endpoint_name,
