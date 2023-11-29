@@ -55,9 +55,10 @@ class _DatabricksServingEndpointClient(_DatabricksClientBase):
 
     def post(self, request: Any) -> Any:
         # See https://docs.databricks.com/machine-learning/model-serving/score-model-serving-endpoints.html
-        wrapped_request = {"dataframe_records": [request]} # {"inputs": request} # request # {"dataframe_records": [request]}
-        _logger.info(f"REQUEST {wrapped_request}")
-        response = self.post_raw(wrapped_request) # ["predictions"]
+        # wrapped_request = {"dataframe_records": [request]} # {"inputs": request} # request # {"dataframe_records": [request]}
+        _logger.info(f"REQUEST {request}")
+        response = self.post_raw(request) # ["predictions"]
+        _logger.info(f"RESPONSE {response}")
         # For a single-record query, the result is not a list.
         if isinstance(response, list):
             response = response[0]
